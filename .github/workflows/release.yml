@@ -58,7 +58,51 @@ jobs:
           name: plugin-zip
           path: AudioForge.zip
 
+  check-flatpak-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      previous_tag: ${{ steps.check.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for flatpak source changes
+        id: check
+        run: |
+          # Find the previous release tag
+          current_tag="${GITHUB_REF#refs/tags/}"
+          previous_tag=$(git tag --sort=-v:refname | grep -v "^${current_tag}$" | head -n 1)
+
+          echo "Current tag: ${current_tag}"
+          echo "Previous tag: ${previous_tag}"
+          echo "previous_tag=${previous_tag}" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$previous_tag" ]; then
+            echo "No previous tag found — flatpak build required"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check if flatpak-related paths changed
+          changes=$(git diff --name-only "${previous_tag}..${current_tag}" -- \
+            org.audioforge.jamesdsp.yaml \
+            flatpak-meta/ \
+            jdsp/)
+
+          if [ -n "$changes" ]; then
+            echo "Flatpak source changed:"
+            echo "$changes"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No flatpak source changes — will reuse previous release binary"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-flatpak:
+    needs: check-flatpak-changes
+    if: needs.check-flatpak-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     container:
       image: bilelmoussaoui/flatpak-github-actions:kde-6.7
@@ -78,8 +122,29 @@ jobs:
           name: flatpak-bundle
           path: jamesdsp.flatpak
 
+  reuse-flatpak:
+    needs: check-flatpak-changes
+    if: needs.check-flatpak-changes.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download flatpak from previous release
+        run: |
+          previous_tag="${{ needs.check-flatpak-changes.outputs.previous_tag }}"
+          echo "Downloading jamesdsp.flatpak from release ${previous_tag}"
+          gh release download "${previous_tag}" \
+            --repo "${{ github.repository }}" \
+            --pattern "jamesdsp.flatpak"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-bundle
+          path: jamesdsp.flatpak
+
   release:
-    needs: [build-plugin, build-flatpak]
+    needs: [build-plugin, build-flatpak, reuse-flatpak]
+    if: always() && needs.build-plugin.result == 'success' && (needs.build-flatpak.result == 'success' || needs.reuse-flatpak.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
