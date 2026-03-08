@@ -35,7 +35,7 @@ AudioForge ships a **patched JamesDSP flatpak** (`org.audioforge.jamesdsp`) that
 ### Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/neoseek/AudioForge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/neoseek/AudioForge/master/install.sh | bash
 ```
 
 This downloads the latest release, extracts it to the Decky plugins directory, and restarts Decky Loader.
