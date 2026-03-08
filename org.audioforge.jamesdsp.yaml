@@ -77,9 +77,9 @@ modules:
       - CONFIG+=NO_CRASH_HANDLER
     sources:
       - type: dir
-        path: /home/deck/code/JDSP4Linux
+        path: jdsp
       - type: dir
-        path: /home/deck/code/AudioForge/flatpak-meta
+        path: flatpak-meta
         dest: audioforge-meta
     post-install:
       - install -Dm644 LICENSE $FLATPAK_DEST/share/licenses/$FLATPAK_ID

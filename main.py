@@ -1,8 +1,10 @@
 import asyncio
+import json
 import os
 import re
 import subprocess
 import time
+import urllib.request
 from EelParser import EELParser
 from ddc import VdcDbHandler
 from extendedsettings import ExtendedSettings
@@ -19,6 +21,8 @@ JDSP_LOG_DIR =  os.path.join(decky.DECKY_PLUGIN_LOG_DIR, 'jdsp')
 JDSP_LOG = os.path.join(JDSP_LOG_DIR, 'jdsp.log')
 JDSP_FLATPAK_BUNDLE = os.path.join(decky.DECKY_PLUGIN_DIR, 'bin', 'jamesdsp.flatpak')
 JDSP_MIN_VER = '2.7.0'
+GITHUB_REPO = 'neoseek/AudioForge'
+PLUGIN_VERSION = json.load(open(os.path.join(decky.DECKY_PLUGIN_DIR, 'package.json')))['version']
 
 log = decky.logger
 
@@ -112,6 +116,14 @@ class Plugin:
         OnDisk.user.settings.setDefaults(Setting.defaults())
         OnDisk.user.profiles.setDefaults(ProfileSetting.defaults())    
         
+    def _download_flatpak_bundle(self):
+        """Download the JamesDSP flatpak bundle from the GitHub release matching the plugin version."""
+        url = f'https://github.com/{GITHUB_REPO}/releases/download/v{PLUGIN_VERSION}/jamesdsp.flatpak'
+        log.info(f'Downloading JamesDSP flatpak from {url}...')
+        os.makedirs(os.path.dirname(JDSP_FLATPAK_BUNDLE), exist_ok=True)
+        urllib.request.urlretrieve(url, JDSP_FLATPAK_BUNDLE)
+        log.info('Download complete')
+
     def _handle_jdsp_install(self):
         log.info('Checking for patched JamesDSP installation...')
         try:
@@ -130,10 +142,14 @@ class Plugin:
                     log.info(f'Minimum version is {JDSP_MIN_VER}')
 
             if not os.path.exists(JDSP_FLATPAK_BUNDLE):
-                log.error(f'Patched JamesDSP flatpak bundle not found at {JDSP_FLATPAK_BUNDLE}')
-                return False
+                log.info(f'Flatpak bundle not found locally, attempting download...')
+                try:
+                    self._download_flatpak_bundle()
+                except Exception as e:
+                    log.error(f'Failed to download JamesDSP flatpak: {e}')
+                    return False
 
-            log.info('Installing patched JamesDSP from bundled flatpak...')
+            log.info('Installing patched JamesDSP from flatpak bundle...')
             installRes = flatpak_CMD(['--user', '-y', 'install', JDSP_FLATPAK_BUNDLE])
             log.info(installRes.stdout)
             log.info('Patched JamesDSP installed successfully')

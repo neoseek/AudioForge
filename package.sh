@@ -28,9 +28,12 @@ cp py_modules/*.py "out/${PLUGIN_NAME}/py_modules/"
 # Resources
 cp defaults/resources/* "out/${PLUGIN_NAME}/resources/"
 
-# Binaries
-if ls bin/* 1>/dev/null 2>&1; then
-  cp bin/* "out/${PLUGIN_NAME}/bin/"
+# Flatpak bundle (kept separate due to size, but included if present)
+if [ -f bin/jamesdsp.flatpak ]; then
+  cp bin/jamesdsp.flatpak "out/${PLUGIN_NAME}/bin/"
+  echo "Included jamesdsp.flatpak in package"
+else
+  echo "WARNING: bin/jamesdsp.flatpak not found - users will need to install it separately"
 fi
 
 cd out

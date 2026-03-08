@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  build-plugin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,21 +51,49 @@ jobs:
           # Resources
           cp defaults/resources/* "${plugin_name}/resources/"
 
-          # Binaries (flatpak bundled separately in bin/)
-          if ls bin/* 1>/dev/null 2>&1; then
-            cp bin/* "${plugin_name}/bin/"
-          fi
-
           zip -r "${plugin_name}.zip" "${plugin_name}"
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: AudioForge
+          name: plugin-zip
           path: AudioForge.zip
+
+  build-flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:kde-6.10
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: org.audioforge.jamesdsp.yaml
+          bundle: jamesdsp.flatpak
+          upload-artifact: flatpak-bundle
+          cache-key: flatpak-builder-${{ github.sha }}
+
+  release:
+    needs: [build-plugin, build-flatpak]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: plugin-zip
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: flatpak-bundle
+
+      - name: Verify artifacts
+        run: ls -lh jamesdsp.flatpak AudioForge.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: AudioForge.zip
+          files: |
+            AudioForge.zip
+            jamesdsp.flatpak
           generate_release_notes: true

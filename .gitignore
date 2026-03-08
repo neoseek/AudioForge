@@ -57,3 +57,6 @@ bin/
 build-dir/
 repo/
 .flatpak-builder/
+
+# JamesDSP source build artifacts
+jdsp/build/

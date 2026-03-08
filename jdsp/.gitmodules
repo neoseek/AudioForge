@@ -1,0 +1,12 @@
+[submodule "src/subprojects/GraphicEQWidget"]
+	path = src/subprojects/GraphicEQWidget
+	url = https://github.com/ThePBone/GraphicEQWidget.git
+[submodule "src/subprojects/FlatTabWidget"]
+	path = src/subprojects/FlatTabWidget
+	url = https://github.com/ThePBone/FlatTabWidget.git
+[submodule "src/subprojects/LiquidEqualizerWidget"]
+	path = src/subprojects/LiquidEqualizerWidget
+	url = https://github.com/ThePBone/LiquidEqualizerWidget.git
+[submodule "src/subprojects/EELEditor"]
+	path = src/subprojects/EELEditor
+	url = https://github.com/ThePBone/LiveprogIDE
