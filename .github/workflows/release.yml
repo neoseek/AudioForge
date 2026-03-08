@@ -70,8 +70,13 @@ jobs:
         with:
           manifest-path: org.audioforge.jamesdsp.yaml
           bundle: jamesdsp.flatpak
-          upload-artifact: flatpak-bundle
+          upload-artifact: false
           cache-key: flatpak-builder-${{ github.sha }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-bundle
+          path: jamesdsp.flatpak
 
   release:
     needs: [build-plugin, build-flatpak]
