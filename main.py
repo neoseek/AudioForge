@@ -224,8 +224,8 @@ class Plugin:
         
         xauth = get_xauthority()
         new_env = env.copy()
-        # run without gui
-        # new_env['QT_QPA_PLATFORM'] = 'offscreen'
+        # run without gui in Game Mode (no X11 display available)
+        new_env['QT_QPA_PLATFORM'] = 'offscreen'
         if xauth: new_env['XAUTHORITY'] = xauth
         flatpak_CMD(['kill', APPLICATION_ID], noCheck=True)
         with open(JDSP_LOG, "w") as jdsp_log:
