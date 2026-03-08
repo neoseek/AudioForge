@@ -33,7 +33,7 @@ class Setting(SettingDef):
     RESTART_PIPELINE_ON_DEVICE = 'restartPipelineOnDeviceDetect'
 
     class Defaults:
-        ENABLE_IN_DESKTOP = False
+        ENABLE_IN_DESKTOP = True
         RESTART_PIPELINE_ON_DEVICE = []
         
 
