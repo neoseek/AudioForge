@@ -12,7 +12,7 @@ from settings import SettingsManager
 
 from env import env
 from jdspproxy import JdspProxy
-from utils import SettingDef, compare_versions, flatpak_CMD, get_xauthority, wrap_error, restart_wireplumber
+from utils import SettingDef, compare_versions, flatpak_CMD, get_xauthority, wrap_error, restart_wireplumber, set_alsa_master_volume
 
 import decky
 
@@ -245,6 +245,7 @@ class Plugin:
         flatpak_CMD(['kill', APPLICATION_ID], noCheck=True)
         with open(JDSP_LOG, "w") as jdsp_log:
             subprocess.Popen(f'flatpak --user run {APPLICATION_ID} --tray', stdout=jdsp_log, stderr=jdsp_log, shell=True, env=new_env, universal_newlines=True)
+        set_alsa_master_volume()
         return True # assume process has started ignoring errors so that the frontend doesn't hang. the jdsp process errors will be logged in its own file
 
     # general-frontend-call
