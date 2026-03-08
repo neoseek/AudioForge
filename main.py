@@ -12,6 +12,7 @@ from settings import SettingsManager
 from env import env
 from jdspproxy import JdspProxy
 from utils import SettingDef, compare_versions, flatpak_CMD, get_xauthority, wrap_error, restart_wireplumber, set_alsa_master_volume
+from volume_forwarder import VolumeForwarder
 
 import decky
 
@@ -75,6 +76,7 @@ class Plugin:
     jdsp: JdspProxy = None
     jdsp_install_state = 'installing'  # 'installing', 'ready', 'failed'
     _install_complete: asyncio.Event = None
+    _volume_forwarder: VolumeForwarder = None
     current_preset = ''
     vdc_handler: VdcDbHandler
     eel_parser: EELParser
@@ -122,6 +124,7 @@ class Plugin:
 
     async def _unload(self):
         log.info('Unloading plugin...')
+        await self._stop_volume_forwarder()
         flatpak_CMD(['kill', APPLICATION_ID], noCheck=True)
         
     def _init_defaults(self):
@@ -283,11 +286,24 @@ class Plugin:
         with open(JDSP_LOG, "w") as jdsp_log:
             subprocess.Popen(f'flatpak --user run {APPLICATION_ID} --tray', stdout=jdsp_log, stderr=jdsp_log, shell=True, env=new_env, universal_newlines=True)
         set_alsa_master_volume()
+        await self._start_volume_forwarder()
         return True # assume process has started ignoring errors so that the frontend doesn't hang. the jdsp process errors will be logged in its own file
+
+    async def _start_volume_forwarder(self):
+        if self._volume_forwarder:
+            await self._volume_forwarder.stop()
+        self._volume_forwarder = VolumeForwarder()
+        await self._volume_forwarder.start()
+
+    async def _stop_volume_forwarder(self):
+        if self._volume_forwarder:
+            await self._volume_forwarder.stop()
+            self._volume_forwarder = None
 
     # general-frontend-call
     async def kill_jdsp(self):
         log.info('Killing JamesDSP')
+        await self._stop_volume_forwarder()
         flatpak_CMD(['kill', APPLICATION_ID], noCheck=True)
         
     async def force_pw_relink(self):
