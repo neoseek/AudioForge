@@ -92,8 +92,18 @@ jobs:
         with:
           name: flatpak-bundle
 
+      - name: Include flatpak in plugin ZIP
+        run: |
+          plugin_name="AudioForge"
+          # Unzip, add flatpak bundle, re-zip
+          unzip -o "${plugin_name}.zip"
+          mkdir -p "${plugin_name}/bin"
+          cp jamesdsp.flatpak "${plugin_name}/bin/"
+          rm "${plugin_name}.zip"
+          zip -r "${plugin_name}.zip" "${plugin_name}"
+
       - name: Verify artifacts
-        run: ls -lh jamesdsp.flatpak AudioForge.zip
+        run: ls -lh jamesdsp.flatpak AudioForge.zip && unzip -l AudioForge.zip | grep flatpak
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
