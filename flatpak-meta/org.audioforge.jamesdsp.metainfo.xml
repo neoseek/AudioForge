@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.audioforge.jamesdsp</id>
+
+  <name>JamesDSP (AudioForge)</name>
+  <developer_name>AudioForge</developer_name>
+  <summary>Patched audio effect processor for Pipewire</summary>
+  <content_rating type="oars-1.1" />
+  <keywords>
+    <keyword>audio</keyword>
+    <keyword>dsp</keyword>
+    <keyword>effects</keyword>
+    <keyword>jdsp</keyword>
+    <keyword>pipewire</keyword>
+    <keyword>convolver</keyword>
+    <keyword>reverb</keyword>
+    <keyword>surround</keyword>
+    <keyword>equalizer</keyword>
+  </keywords>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <description>
+    <p>
+      A patched version of JamesDSP for Linux with a fix for the loopback feedback loop bug on SteamOS. Based on JDSP4Linux by Tim Schneeberger.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/audioforge/AudioForge</url>
+  <url type="bugtracker">https://github.com/audioforge/AudioForge/issues</url>
+
+  <provides>
+    <binary>jamesdsp</binary>
+    <dbus type="user">org.audioforge.jamesdsp</dbus>
+  </provides>
+
+  <releases>
+    <release type="stable" version="2.7.0-audioforge1" date="2026-03-07T00:00:00Z">
+      <description>
+        <p>Initial AudioForge release based on JamesDSP 2.7.0 with loopback feedback loop fix.</p>
+      </description>
+    </release>
+  </releases>
+
+  <launchable type="desktop-id">org.audioforge.jamesdsp.desktop</launchable>
+</component>

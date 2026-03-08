@@ -1,0 +1,20 @@
+{
+  "name": "AudioForge",
+  "author": "AudioForge",
+  "flags": [],
+  "api_version": 2,
+  "publish": {
+    "tags": [
+      "dsp",
+      "eq",
+      "equalizer",
+      "sound",
+      "audio",
+      "fx",
+      "effects",
+      "reverb",
+      "compressor"],
+    "description": "Full audio effects DSP with integrated JamesDSP. EQ, Reverb and much more. Per-game settings possible.",
+    "image": ""
+  }
+}

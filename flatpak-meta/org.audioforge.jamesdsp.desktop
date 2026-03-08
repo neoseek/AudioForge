@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=JamesDSP (AudioForge)
+Comment=Audio effect processor for Pipewire (patched)
+Categories=AudioVideo;Audio;Qt;
+
+Icon=org.audioforge.jamesdsp
+Exec=jamesdsp
+Terminal=false

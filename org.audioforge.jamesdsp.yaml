@@ -1,0 +1,88 @@
+app-id: org.audioforge.jamesdsp
+runtime: org.kde.Platform
+runtime-version: '6.10'
+sdk: org.kde.Sdk
+command: jamesdsp
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --filesystem=xdg-run/pipewire-0:ro
+  - --device=dri
+  - --talk-name=org.kde.StatusNotifierWatcher
+cleanup:
+  - '*.a'
+  - '*.la'
+  - '*.h'
+  - '*.m4'
+  - '*.pm'
+  - /include
+  - /lib/pkgconfig
+  - /share/pkgconfig
+modules:
+  - name: mm-common
+    config-opts:
+      - --disable-documentation
+    cleanup:
+      - '*'
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/mm-common/1.0/mm-common-1.0.7.tar.xz
+        sha256: 494abfce781418259b1e9d8888c73af4de4b6f3be36cc75d9baa8baa0f2a7a39
+
+  - name: sigc++
+    config-opts:
+      - --disable-documentation
+    cleanup:
+      - /lib/sigc++-2.0
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/libsigc++/2.12/libsigc++-2.12.1.tar.xz
+        sha256: a9dbee323351d109b7aee074a9cb89ca3e7bcf8ad8edef1851f4cf359bd50843
+
+  - name: glibmm
+    buildsystem: meson
+    config-opts:
+      - -Dmaintainer-mode=false
+      - -Dbuild-documentation=false
+      - -Dbuild-examples=false
+    cleanup:
+      - /lib/glibmm-2.4
+      - /lib/giomm-2.4
+    sources:
+      - type: archive
+        url: https://ftp.gnome.org/pub/GNOME/sources/glibmm/2.66/glibmm-2.66.6.tar.xz
+        sha256: 5358742598181e5351d7bf8da072bf93e6dd5f178d27640d4e462bc8f14e152f
+
+  - name: portal-qt6
+    buildsystem: meson
+    config-opts:
+      - -Dvapi=false
+      - -Ddocs=false
+      - -Dbackend-qt6=enabled
+    cleanup:
+      - /lib/girepository-1.0
+      - /share/gir-1.0
+    sources:
+      - type: git
+        url: https://github.com/flatpak/libportal.git
+        commit: 796053d2eebe4532aad6bd3fd80cdf3b197806ec
+
+  - name: jamesdsp
+    buildsystem: qmake
+    config-opts:
+      - CONFIG+=force_debug_info
+      - CONFIG+=FLATPAK
+      - CONFIG+=NO_CRASH_HANDLER
+    sources:
+      - type: dir
+        path: /home/deck/code/JDSP4Linux
+      - type: dir
+        path: /home/deck/code/AudioForge/flatpak-meta
+        dest: audioforge-meta
+    post-install:
+      - install -Dm644 LICENSE $FLATPAK_DEST/share/licenses/$FLATPAK_ID
+      - install -Dm644 audioforge-meta/$FLATPAK_ID.desktop $FLATPAK_DEST/share/applications/$FLATPAK_ID.desktop
+      - install -Dm644 audioforge-meta/$FLATPAK_ID.metainfo.xml $FLATPAK_DEST/share/metainfo/$FLATPAK_ID.metainfo.xml
+      - install -Dm644 meta/flatpak/jamesdsp.svg $FLATPAK_DEST/share/icons/hicolor/scalable/apps/$FLATPAK_ID.svg

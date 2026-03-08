@@ -1,0 +1,64 @@
+{
+  "name": "audioforge",
+  "version": "0.1.0",
+  "description": "Audio DSP plugin with integrated JamesDSP",
+  "type": "module",
+  "scripts": {
+    "build": "shx rm -rf dist && rollup -c",
+    "watch": "rollup -c -w",
+    "package": "pnpm run build && bash package.sh",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audioforge/AudioForge.git"
+  },
+  "keywords": [
+    "decky",
+    "plugin",
+    "steam-deck",
+    "deck",
+    "dsp",
+    "eq",
+    "equalizer",
+    "sound",
+    "audio",
+    "fx",
+    "effects",
+    "reverb",
+    "compressor"
+  ],
+  "author": "AudioForge",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/audioforge/AudioForge/issues"
+  },
+  "homepage": "https://github.com/audioforge/AudioForge#readme",
+  "devDependencies": {
+    "@rollup/plugin-replace": "^6.0.2",
+    "@decky/rollup": "^1.0.1",
+    "@decky/ui": "^4.11.1",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@types/webpack": "^5.28.5",
+    "rollup": "^4.22.5",
+    "shx": "^0.3.4",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "mobx": "^6.12.0",
+    "mobx-react-lite": "^4.0.5",
+    "react-qr-code": "^2.0.12",
+    "react-icons": "^5.3.0",
+    "@decky/api": "^1.1.2",
+    "tslib": "^2.7.0"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "react",
+        "react-dom"
+      ]
+    }
+  }
+}

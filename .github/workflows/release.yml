@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Create release archive
+        run: |
+          plugin_name=$(jq -r '.name' plugin.json)
+
+          mkdir -p "${plugin_name}/dist"
+          mkdir -p "${plugin_name}/py_modules"
+          mkdir -p "${plugin_name}/bin"
+          mkdir -p "${plugin_name}/resources"
+
+          # Frontend bundle
+          cp dist/index.js "${plugin_name}/dist/"
+          cp dist/index.js.map "${plugin_name}/dist/"
+
+          # Plugin metadata
+          cp plugin.json "${plugin_name}/"
+          cp package.json "${plugin_name}/"
+          cp LICENSE "${plugin_name}/"
+
+          # Backend
+          cp main.py "${plugin_name}/"
+          cp py_modules/*.py "${plugin_name}/py_modules/"
+
+          # Resources
+          cp defaults/resources/* "${plugin_name}/resources/"
+
+          # Binaries (flatpak bundled separately in bin/)
+          if ls bin/* 1>/dev/null 2>&1; then
+            cp bin/* "${plugin_name}/bin/"
+          fi
+
+          zip -r "${plugin_name}.zip" "${plugin_name}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioForge
+          path: AudioForge.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: AudioForge.zip
+          generate_release_notes: true
