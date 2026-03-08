@@ -4,7 +4,7 @@ import { PLUGIN_NAME } from '../../defines/constants';
 import { FlatpakFixState } from '../../types/types';
 
 export const FixFlatpakDescriptions = {
-    default: `${PLUGIN_NAME} encountered an error with the James DSP flatpak dependency. You can try to run this fix to automatically repair the flatpak installation. After the process is complete the plugin must be reloaded and an active internet connection is required.`,
+    default: `${PLUGIN_NAME} encountered an error with the JamesDSP flatpak installation. You can try to run this fix to automatically repair it. After the process is complete the plugin must be reloaded. An active internet connection is required.`,
     done: `The repair process completed. Reload ${PLUGIN_NAME} from the Decky plugin menu. An active internet connection is required during the reload process.`
 };
 

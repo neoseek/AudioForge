@@ -73,7 +73,8 @@ class OnDisk:
 
 class Plugin:
     jdsp: JdspProxy = None
-    jdsp_install_state = False
+    jdsp_install_state = 'installing'  # 'installing', 'ready', 'failed'
+    _install_complete: asyncio.Event = None
     current_preset = ''
     vdc_handler: VdcDbHandler
     eel_parser: EELParser
@@ -86,11 +87,25 @@ class Plugin:
 
         self.jdsp = JdspProxy(APPLICATION_ID, log)
 
-        if(self._handle_jdsp_install()):
-            self.jdsp_install_state = True
-            log.info('Plugin ready')
-        else:
-            log.error('Problem with JamesDSP installation')
+        self._install_complete = asyncio.Event()
+        self.jdsp_install_state = 'installing'
+        # Run blocking install in background thread so frontend RPC calls aren't blocked
+        asyncio.ensure_future(self._run_install_async())
+
+    async def _run_install_async(self):
+        try:
+            result = await asyncio.to_thread(self._handle_jdsp_install)
+            if result:
+                self.jdsp_install_state = 'ready'
+                log.info('Plugin ready')
+            else:
+                self.jdsp_install_state = 'failed'
+                log.error('Problem with JamesDSP installation')
+        except Exception as e:
+            self.jdsp_install_state = 'failed'
+            log.error(f'Install error: {e}')
+        finally:
+            self._install_complete.set()
 
     async def _uninstall(self):
         log.info('Uninstalling plugin...')
@@ -113,15 +128,21 @@ class Plugin:
         OnDisk.user.settings.setDefaults(Setting.defaults())
         OnDisk.user.profiles.setDefaults(ProfileSetting.defaults())    
         
+    def _get_installed_jdsp_version(self):
+        """Return the installed JamesDSP version string, or '' if not found."""
+        try:
+            res = flatpak_CMD(['list', '--user', '--app', '--columns=application,version'])
+            for line in res.stdout.split('\n'):
+                if line.startswith(APPLICATION_ID):
+                    return line.split()[1]
+        except subprocess.CalledProcessError:
+            pass
+        return ''
+
     def _handle_jdsp_install(self):
         log.info('Checking for patched JamesDSP installation...')
         try:
-            flatpakListRes = flatpak_CMD(['list', '--user', '--app', '--columns=application,version'])
-            installed_version = ''
-
-            for line in flatpakListRes.stdout.split('\n'):
-                if line.startswith(APPLICATION_ID):
-                    installed_version = line.split()[1]
+            installed_version = self._get_installed_jdsp_version()
 
             if installed_version != '':
                 log.info(f'JamesDSP version {installed_version} is installed')
@@ -142,6 +163,30 @@ class Plugin:
             return True
 
         except subprocess.CalledProcessError as e:
+            if 'already installed' in (e.stderr or ''):
+                # A previous install may still be in progress or left a partial state.
+                # Wait for it to finish, then re-check the version.
+                log.info('Install reported "already installed" — waiting for any in-progress install to complete...')
+                for attempt in range(6):
+                    time.sleep(5)
+                    installed_version = self._get_installed_jdsp_version()
+                    if installed_version != '':
+                        log.info(f'JamesDSP version {installed_version} now detected')
+                        if compare_versions(installed_version, JDSP_MIN_VER) >= 0:
+                            return True
+                        break
+
+                # Still broken — remove and reinstall cleanly
+                log.info('Detected broken/partial JamesDSP install, removing and reinstalling...')
+                try:
+                    flatpak_CMD(['--user', '-y', 'uninstall', APPLICATION_ID], noCheck=True)
+                    installRes = flatpak_CMD(['--user', '-y', 'install', '--or-update', JDSP_FLATPAK_BUNDLE])
+                    log.info(installRes.stdout)
+                    log.info('Patched JamesDSP reinstalled successfully')
+                    return True
+                except subprocess.CalledProcessError as e2:
+                    log.error(f'Failed to reinstall after cleanup: {e2.stderr}')
+                    return False
             log.error(e.stderr)
             return False
         
@@ -216,8 +261,15 @@ class Plugin:
     """
 
     # general-frontend-call
+    async def get_install_status(self):
+        return self.jdsp_install_state
+
+    # general-frontend-call
     async def start_jdsp(self):
-        if not self.jdsp_install_state:
+        # Wait for install to complete if still in progress
+        if self.jdsp_install_state == 'installing':
+            await self._install_complete.wait()
+        if self.jdsp_install_state != 'ready':
             return False
         
         log.info(f'Starting JamesDSP... See process logs at {JDSP_LOG}')

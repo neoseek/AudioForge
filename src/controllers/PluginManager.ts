@@ -97,12 +97,19 @@ export class PluginManager {
 
         if (!await this.isJDSPReady()) {
             Log.log('Starting James DSP...')
-            this.promises.jdspLoaded = Backend.startJDSP()
-                .then(res => {
+            this.promises.jdspLoaded = (async () => {
+                const installStatus = await Backend.getInstallStatus().catch(() => 'failed' as const);
+                if (installStatus === 'installing') {
+                    toast(`${PLUGIN_NAME}`, 'Installing JamesDSP, please wait...', 8000);
+                }
+                try {
+                    const res = await Backend.startJDSP();
                     if (!res) useError(`James DSP couldn't be started because a problem was detected with it's installation`);
                     return res;
-                })
-                .catch(e => useError('Encountered an error when trying to start James DSP', e));
+                } catch (e) {
+                    return useError('Encountered an error when trying to start James DSP', e);
+                }
+            })();
         }
 
         if (!await this.isJDSPReady() || await this.isStatePromiseStatusOk('profileManagerLoaded')) return;

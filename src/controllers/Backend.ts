@@ -10,6 +10,7 @@ export type PluginInitUserMethod = 'init_user';
 export type PluginSetSettingMethod = 'set_settings';
 export type PluginGetStaticDataMethod = 'get_static_data';
 export type PluginStartJDSPMethod = 'start_jdsp';
+export type PluginGetInstallStatusMethod = 'get_install_status';
 export type PluginKillJDSPMethod = 'kill_jdsp';
 export type PluginRelinkPW = 'force_pw_relink';
 export type PluginSetAppWatchMethod = 'set_app_watch';
@@ -23,11 +24,14 @@ export type PluginGetVdcDbSelectionsMethod = 'get_vdc_db_selections';
 export type PluginSetVdcDbSelectionMethod = 'set_vdc_db_selection';
 
 
+export type InstallStatus = 'installing' | 'ready' | 'failed';
+
 export type PluginMethod =
     PluginInitUserMethod |
     PluginSetSettingMethod |
     PluginGetStaticDataMethod |
     PluginStartJDSPMethod |
+    PluginGetInstallStatusMethod |
     PluginKillJDSPMethod |
     PluginRelinkPW |
     PluginSetAppWatchMethod |
@@ -42,7 +46,7 @@ export type PluginMethod =
 
 export type PluginMethodArgs<Method extends PluginMethod> =
     Method extends PluginInitUserMethod ? [userId: string, accountName: string, personaName: string] :
-    Method extends PluginStartJDSPMethod | PluginKillJDSPMethod | PluginRelinkPW | PluginFlatpakRepairMethod | PluginResetEELParamsMethod | PluginGetStaticDataMethod | PluginGetVdcDbSelectionsMethod ? [] :
+    Method extends PluginStartJDSPMethod | PluginGetInstallStatusMethod | PluginKillJDSPMethod | PluginRelinkPW | PluginFlatpakRepairMethod | PluginResetEELParamsMethod | PluginGetStaticDataMethod | PluginGetVdcDbSelectionsMethod ? [] :
     Method extends PluginSetSettingMethod ? [settings: Partial<PluginSettings>] :
     Method extends PluginSetAppWatchMethod ? [appId: string, watch: boolean] :
     Method extends PluginInitProfilesMethod ? [globalPreset: string, userId: string] :
@@ -56,6 +60,7 @@ export type PluginMethodResponse<Method extends PluginMethod> =
     Method extends PluginInitUserMethod ? PluginSettings :
     Method extends PluginGetStaticDataMethod ? Static :
     Method extends PluginStartJDSPMethod ? boolean :
+    Method extends PluginGetInstallStatusMethod ? InstallStatus :
     Method extends PluginKillJDSPMethod | PluginRelinkPW | PluginSetSettingMethod | PluginSetAppWatchMethod | PluginSetManuallyApplyProfilesMethod | PluginFlatpakRepairMethod | PluginSetEELParamMethod | PluginResetEELParamsMethod | PluginSetVdcDbSelectionMethod ? undefined :
     Method extends PluginInitProfilesMethod ? { manualPreset: string, allPresets: string, watchedGames: { [appId: string]: boolean }, manuallyApply: boolean } :
     Method extends PluginGetEELParamsAndDescMethod ? EELData :
@@ -149,6 +154,9 @@ export class Backend {
     //general plugin calls
     static async startJDSP() {
         return await this.callPlugin('start_jdsp');
+    }
+    static async getInstallStatus() {
+        return await this.callPlugin('get_install_status');
     }
     static async killJDSP() {
         return await this.callPlugin('kill_jdsp');
