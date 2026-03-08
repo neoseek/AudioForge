@@ -135,7 +135,7 @@ class Plugin:
                 return False
 
             log.info('Installing patched JamesDSP from flatpak bundle...')
-            installRes = flatpak_CMD(['--user', '-y', 'install', JDSP_FLATPAK_BUNDLE])
+            installRes = flatpak_CMD(['--user', '-y', 'install', '--or-update', JDSP_FLATPAK_BUNDLE])
             log.info(installRes.stdout)
             log.info('Patched JamesDSP installed successfully')
 
