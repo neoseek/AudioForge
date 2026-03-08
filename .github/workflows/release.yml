@@ -20,6 +20,31 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Validate and set version from tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+
+          # Must be semver: MAJOR.MINOR.PATCH with optional -prerelease suffix
+          if ! echo "$version" | grep -qP '^\d+\.\d+\.\d+(-[a-zA-Z0-9]+[a-zA-Z0-9.]*)?$'; then
+            echo "::error::Invalid version '${version}'. Must match MAJOR.MINOR.PATCH (e.g. v1.2.3 or v1.2.3-rc1)"
+            exit 1
+          fi
+
+          # Each numeric part must be a valid integer (no leading zeros except bare 0)
+          IFS='.' read -r major minor patch_full <<< "$version"
+          patch="${patch_full%%-*}"
+          for part in "$major" "$minor" "$patch"; do
+            if echo "$part" | grep -qP '^0\d+'; then
+              echo "::error::Version part '${part}' has leading zeros"
+              exit 1
+            fi
+          done
+
+          echo "Setting version to ${version}"
+          jq --arg v "$version" '.version = $v' plugin.json > plugin.json.tmp && mv plugin.json.tmp plugin.json
+          jq --arg v "$version" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
