@@ -66,36 +66,30 @@ def wrap_error(e):
     return { 'error': str(e) }
 
 def set_alsa_master_volume():
-    """Set ALSA Master volume to 100% on all cards that have a Master control.
+    """Set ALSA volume to 100% on the active sink's ALSA card.
 
     When JamesDSP's virtual sink is the default PipeWire sink, PipeWire volume
-    changes only affect the virtual sink and no longer control the ALSA Master.
-    The ALSA Master resets to the kernel driver default on every boot (e.g. 69%
+    changes only affect the virtual sink and no longer control the hardware.
+    The ALSA volume resets to the kernel driver default on every boot (e.g. 69%
     for ALC257), so we need to max it out when JamesDSP takes over.
+
+    Uses the volume forwarder helpers to resolve the currently active card
+    and its appropriate control (Master, PCM, Headphone, etc.).
     """
     log = decky.logger
     try:
-        result = subprocess.run(
-            ['cat', '/proc/asound/cards'],
+        from volume_forwarder import _resolve_active_card
+        card_info = _resolve_active_card()
+        if card_info is None:
+            log.info('No active ALSA card found — skipping initial volume set')
+            return
+        subprocess.run(
+            ['amixer', '-c', card_info.card, 'set', card_info.control, '100%'],
             capture_output=True, text=True, check=True
         )
-        card_nums = []
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if line and line[0].isdigit():
-                card_nums.append(line.split()[0])
-
-        for card in card_nums:
-            try:
-                subprocess.run(
-                    ['amixer', '-c', card, 'set', 'Master', '100%'],
-                    capture_output=True, text=True, check=True
-                )
-                log.info(f'Set ALSA Master to 100% on card {card}')
-            except subprocess.CalledProcessError:
-                pass  # Card has no Master control, skip
+        log.info(f'Set ALSA {card_info.control} to 100% on card {card_info.card}')
     except Exception as e:
-        log.warning(f'Failed to set ALSA Master volume: {e}')
+        log.warning(f'Failed to set ALSA volume: {e}')
 
 async def restart_wireplumber(timeout: float, post_delay: float):
     try:
