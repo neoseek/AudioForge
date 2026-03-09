@@ -1,10 +1,9 @@
 import asyncio
-import json
 import math
 import re
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+from typing import List
 
 import decky
 from env import env
@@ -23,7 +22,7 @@ _ALSA_CONTROL_CANDIDATES = ['Master', 'PCM', 'Headphone', 'Speaker']
 
 @dataclass
 class _CardInfo:
-    """Resolved ALSA card + control information for the active sink."""
+    """Resolved ALSA card + control information."""
     card: str          # ALSA card number as a string
     control: str       # Simple-mixer control name (e.g. "Master", "PCM")
     db_floor: float    # Absolute dB range of the control
@@ -74,46 +73,31 @@ def _find_alsa_control(card):
     return None
 
 
-def _get_active_alsa_card() -> Optional[str]:
-    """Return the ALSA card number of the default PipeWire audio sink.
+def _discover_alsa_cards() -> List[_CardInfo]:
+    """Enumerate ALSA cards and return info for those with a volume control.
 
-    Inspects ``@DEFAULT_AUDIO_SINK@`` via ``wpctl`` and looks for the
-    ``alsa.card`` property that PipeWire populates for hardware sinks.
-    Returns ``None`` for non-ALSA sinks (e.g. virtual / Bluetooth).
+    Reads ``/proc/asound/cards`` to find card numbers, probes each for a
+    usable playback control (Master, PCM, Headphone, Speaker), and queries
+    the hardware dB range of the matched control.
     """
+    cards: List[_CardInfo] = []
     try:
         result = subprocess.run(
-            ['wpctl', 'inspect', '@DEFAULT_AUDIO_SINK@'],
-            capture_output=True, text=True, env=env
+            ['cat', '/proc/asound/cards'],
+            capture_output=True, text=True, check=True
         )
-        # wpctl inspect output lines like:  alsa.card = "0"
-        match = re.search(r'alsa\.card\s*=\s*"(\d+)"', result.stdout)
-        if match:
-            return match.group(1)
-    except Exception:
-        pass
-    return None
-
-
-def _resolve_active_card() -> Optional[_CardInfo]:
-    """Resolve the ALSA card, control name, and dB range for the active sink.
-
-    Queries PipeWire for the current default sink's ALSA card, probes it
-    for a usable volume control, and reads the hardware dB range.  Returns
-    ``None`` if no usable ALSA control can be found (e.g. virtual sink,
-    Bluetooth, or exotic hardware without recognised controls).
-    """
-    card = _get_active_alsa_card()
-    if card is None:
-        return None
-    control = _find_alsa_control(card)
-    if control is None:
-        log.debug(f'ALSA card {card} has no recognised playback control')
-        return None
-    db_floor = _get_db_range(card, control)
-    log.info(f'Resolved active sink → ALSA card {card}, '
-             f'control "{control}", dB floor {db_floor}')
-    return _CardInfo(card=card, control=control, db_floor=db_floor)
+        card_nums = re.findall(r'^\s*(\d+)\s+\[', result.stdout, re.MULTILINE)
+        for card in card_nums:
+            control = _find_alsa_control(card)
+            if control is None:
+                continue
+            db_floor = _get_db_range(card, control)
+            cards.append(_CardInfo(card=card, control=control, db_floor=db_floor))
+            log.info(f'Discovered ALSA card {card}: '
+                     f'control "{control}", dB floor {db_floor}')
+    except Exception as e:
+        log.warning(f'Failed to enumerate ALSA cards: {e}')
+    return cards
 
 
 def _get_sink_volume():
@@ -161,28 +145,29 @@ def _linear_to_alsa_pct(volume_fraction, db_floor):
     return max(0, min(100, round((1.0 + db / db_floor) * 100)))
 
 
-def _set_alsa_volume(card_info, volume_fraction, muted):
-    """Set ALSA volume on the active card's resolved control.
+def _set_alsa_volume(cards, volume_fraction, muted):
+    """Set ALSA volume on all discovered hardware cards.
 
-    *card_info* is a ``_CardInfo`` from ``_resolve_active_card``.
-    volume_fraction: 0.0–1.0+ linear amplitude from PipeWire.
+    *cards* is a list of ``_CardInfo`` from ``_discover_alsa_cards``.
+    volume_fraction: 0.0-1.0+ linear amplitude from PipeWire.
     muted: whether to mute the control.
     """
-    pct = _linear_to_alsa_pct(volume_fraction, card_info.db_floor)
-    try:
-        subprocess.run(
-            ['amixer', '-c', card_info.card, 'set',
-             card_info.control, f'{pct}%'],
-            capture_output=True, text=True
-        )
-        toggle = 'mute' if muted else 'unmute'
-        subprocess.run(
-            ['amixer', '-c', card_info.card, 'set',
-             card_info.control, toggle],
-            capture_output=True, text=True
-        )
-    except Exception:
-        pass
+    for info in cards:
+        pct = _linear_to_alsa_pct(volume_fraction, info.db_floor)
+        try:
+            subprocess.run(
+                ['amixer', '-c', info.card, 'set',
+                 info.control, f'{pct}%'],
+                capture_output=True, text=True
+            )
+            toggle = 'mute' if muted else 'unmute'
+            subprocess.run(
+                ['amixer', '-c', info.card, 'set',
+                 info.control, toggle],
+                capture_output=True, text=True
+            )
+        except Exception:
+            pass
 
 
 class VolumeForwarder:
@@ -191,13 +176,12 @@ class VolumeForwarder:
     When JamesDSP's virtual sink is the default PipeWire sink, the system
     volume slider only adjusts the virtual sink's PipeWire volume — but
     null-audio-sink monitor ports don't apply that volume to the audio data.
-    This class listens for volume changes via `pactl subscribe` and applies
+    This class listens for volume changes via ``pactl subscribe`` and applies
     them to the real ALSA hardware mixer so the user hears the change.
 
-    The active ALSA card and its volume control are resolved dynamically
-    from PipeWire (``wpctl inspect @DEFAULT_AUDIO_SINK@``), so the
-    forwarder adapts automatically when the user switches between
-    built-in speakers, HDMI/DP outputs, USB DACs, etc.
+    ALSA cards with playback controls (Master, PCM, Headphone, Speaker)
+    are discovered at startup.  The dB range is queried from hardware so
+    the linear-to-percentage conversion is accurate per card.
     """
 
     def __init__(self):
@@ -205,14 +189,14 @@ class VolumeForwarder:
         self._proc = None
         self._last_volume = None
         self._last_muted = None
-        self._card_info: Optional[_CardInfo] = None
+        self._cards = _discover_alsa_cards()
 
     async def start(self):
         """Start the volume forwarding background task."""
         if self._task and not self._task.done():
             return
         self._task = asyncio.ensure_future(self._monitor())
-        log.info('Volume forwarder started')
+        log.info(f'Volume forwarder started (cards: {self._cards})')
 
     async def stop(self):
         """Stop the volume forwarding background task."""
@@ -230,22 +214,6 @@ class VolumeForwarder:
                 pass
             self._proc = None
         log.info('Volume forwarder stopped')
-
-    def _refresh_card_info(self):
-        """Re-resolve the active ALSA card from PipeWire.
-
-        Called on every sink-change event so we follow device switches
-        (e.g. HDMI plugged in, USB DAC connected).
-        """
-        new_info = _resolve_active_card()
-        if new_info != self._card_info:
-            self._card_info = new_info
-            if new_info:
-                log.info(f'Active card updated → card {new_info.card}, '
-                         f'control "{new_info.control}", '
-                         f'dB floor {new_info.db_floor}')
-            else:
-                log.info('No usable ALSA card for the active sink')
 
     async def _monitor(self):
         """Subscribe to PipeWire sink events and forward volume changes."""
@@ -278,11 +246,7 @@ class VolumeForwarder:
     async def _check_and_forward(self):
         """Read current sink volume and forward to ALSA if changed."""
         try:
-            # Re-resolve on every event so we track device changes.
-            await asyncio.get_event_loop().run_in_executor(
-                None, self._refresh_card_info
-            )
-            if self._card_info is None:
+            if not self._cards:
                 return
 
             volume, muted = await asyncio.get_event_loop().run_in_executor(
@@ -294,9 +258,9 @@ class VolumeForwarder:
             if volume != self._last_volume or muted != self._last_muted:
                 self._last_volume = volume
                 self._last_muted = muted
-                card_info = self._card_info  # capture for executor
+                cards = self._cards  # capture for executor
                 await asyncio.get_event_loop().run_in_executor(
-                    None, _set_alsa_volume, card_info, volume, muted
+                    None, _set_alsa_volume, cards, volume, muted
                 )
         except Exception:
             pass
