@@ -113,7 +113,6 @@ jobs:
 
   check-flatpak-changes:
     needs: determine-build-type
-    if: needs.determine-build-type.outputs.is_test == 'false'
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.check.outputs.changed }}
@@ -126,7 +125,17 @@ jobs:
       - name: Check for flatpak source changes
         id: check
         run: |
-          # Find the previous release tag
+          is_test="${{ needs.determine-build-type.outputs.is_test }}"
+
+          # For test builds, always build flatpak
+          if [ "$is_test" = "true" ]; then
+            echo "Test build — will build flatpak"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "previous_tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # For production builds, check if source changed
           current_tag="${GITHUB_REF#refs/tags/}"
           previous_tag=$(git tag --sort=-v:refname | grep -v "^${current_tag}$" | head -n 1)
 
@@ -157,9 +166,7 @@ jobs:
 
   build-flatpak:
     needs: [determine-build-type, check-flatpak-changes]
-    if: |
-      (needs.determine-build-type.outputs.is_test == 'false' && needs.check-flatpak-changes.outputs.changed == 'true') ||
-      (needs.determine-build-type.outputs.is_test == 'true')
+    if: needs.check-flatpak-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     container:
       image: bilelmoussaoui/flatpak-github-actions:kde-6.7
@@ -181,9 +188,7 @@ jobs:
 
   reuse-flatpak:
     needs: [determine-build-type, check-flatpak-changes]
-    if: |
-      needs.determine-build-type.outputs.is_test == 'false' &&
-      needs.check-flatpak-changes.outputs.changed == 'false'
+    if: needs.check-flatpak-changes.outputs.changed == 'false'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
