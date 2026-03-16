@@ -125,17 +125,6 @@ jobs:
       - name: Check for flatpak source changes
         id: check
         run: |
-          is_test="${{ needs.determine-build-type.outputs.is_test }}"
-
-          # For test builds, always build flatpak
-          if [ "$is_test" = "true" ]; then
-            echo "Test build — will build flatpak"
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "previous_tag=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # For production builds, check if source changed
           current_tag="${GITHUB_REF#refs/tags/}"
           previous_tag=$(git tag --sort=-v:refname | grep -v "^${current_tag}$" | head -n 1)
 
@@ -149,7 +138,7 @@ jobs:
             exit 0
           fi
 
-          # Check if flatpak-related paths changed
+          # Check if flatpak-related paths changed (applies to both test and production)
           changes=$(git diff --name-only "${previous_tag}..${current_tag}" -- \
             org.audioforge.jamesdsp.yaml \
             flatpak-meta/ \
